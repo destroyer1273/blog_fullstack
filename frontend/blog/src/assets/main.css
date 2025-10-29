@@ -1,0 +1,7 @@
+/* Глобальные стили для всего приложения */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
