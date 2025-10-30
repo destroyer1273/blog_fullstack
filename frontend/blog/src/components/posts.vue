@@ -15,6 +15,7 @@ const getAllPosts = async () => {
         console.log("Ошибка загрузки постов", error);
     }
 }
+
 onMounted(() => {
     getAllPosts()
 })

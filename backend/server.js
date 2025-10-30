@@ -2,8 +2,32 @@ const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const pool = require("./db");
+const multer = require("multer");
 
 const app = express();
+
+const storage  = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/posts/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueName = `post_${Date.now()}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+    }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только изображения!'), false);
+    }
+  }
+});
+
 app.use(cors());
 app.use(express.json());
 
@@ -11,9 +35,9 @@ app.get('')
 
 app.get("/api/posts", async (req, res) => {
     try {
-        //users.username на ноуте
+        //users.username на ноуте , users.name пк 16 строчка
         const result = await pool.query(`
-      SELECT posts.*, users.name  
+      SELECT posts.*, users.username  
       FROM posts 
       JOIN users ON posts.author_id = users.id 
       ORDER BY created_at DESC
@@ -40,8 +64,8 @@ app.post('/api/auth/register', async (req ,res) => {
 
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-        const result = await pool.query("INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id, email, name", [email, name, hashedPassword]);
+        // user - пк, username - ноут
+        const result = await pool.query("INSERT INTO users (email, username, password_hash) VALUES ($1, $2, $3) RETURNING id, email, username", [email, name, hashedPassword]);
 
         res.status(201).json({
             message: 'пользователь создан',
@@ -78,7 +102,7 @@ app.post('/api/auth/login', async (req, res) => {
             user: {
                 id: user.id,
                 email: user.email,
-                name: user.name
+                name: user.username
             }
         });
     } catch( err) {
@@ -88,7 +112,7 @@ app.post('/api/auth/login', async (req, res) => {
     
 });
 
-app.post("/api/posts/create", async (req, res) => {
+app.post("/api/posts/create", upload.single('image'), async (req, res) => {
     try {
         const {title, content, authorId } = req.body;
         
@@ -96,10 +120,23 @@ app.post("/api/posts/create", async (req, res) => {
             return res.status(400).json({error: "Все поля обязательны"});
         }
         const userExists = await pool.query("SELECT id From users WHERE id = $1", [authorId]);
+        
         if (userExists.rows.length === 0) {
             return res.status(404).json({error: "Пользователя с таким id не существует"});
         }
-        const result = await pool.query("INSERT INTO posts (title, content, author_id, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *", [title, content, authorId]);
+
+        let result;
+        let imageUrl = null;
+
+        if (req.file) {
+            imageUrl = `/uploads/posts/${req.file.filename}`;
+            result = await pool.query(
+                `INSERT INTO posts (title, content, author_id, image_url, created_at) 
+                VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,[title, content, authorId, imageUrl]);
+        } else {
+            result = await pool.query("INSERT INTO posts (title, content, author_id, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *", [title, content, authorId]);
+        }
+
         
         res.status(201).json({
             message: "Пост создан",
@@ -107,6 +144,27 @@ app.post("/api/posts/create", async (req, res) => {
         });
     } catch (error) {
         console.error("Ошибка создания поста", error);
+        res.status(500).json({error: "Ошибка сервера"});
+    }
+});
+
+app.get("/api/posts/userPosts", async (req, res) => {   
+    try {
+        const { userId } = req.query;
+
+        const userExists = await pool.query("SELECT * FROM posts WHERE author_id = $1", [userId]);
+
+        if(userExists.rows.length === 0) {
+            return res.status(400).json({posts: 0});
+        }
+
+        const result = await pool.query("SELECT * FROM posts WHERE author_id = $1", [userId]);
+
+        res.status(201).json({
+            posts: result.rows
+        });
+    } catch(error) {
+        console.error("Ошибка запроса постов", error);  
         res.status(500).json({error: "Ошибка сервера"});
     }
 });

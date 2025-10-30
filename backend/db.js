@@ -5,7 +5,7 @@ const pool = new Pool({
     port: 5432,
     database: "blog_db",
     user: 'postgres',
-    password: "127312" // "123456"
+    password: "123456" // "123456" "127312"
 });
 
 pool.query('SELECT NOW()', (err, res) => {
