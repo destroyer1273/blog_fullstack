@@ -24,8 +24,7 @@ onMounted(() => {
 <template>
     <div class="posts-container">
         <div v-for="item in posts" class="post">
-            <!-- <img src="" alt="КРутое"> -->
-            <div class="blue">FOTOS Lorem ipsum dolor sit, amet consectetur adipisicing elit. Explicabo voluptatum nemo aut. Deserunt sunt, officiis mollitia culpa, fugiat amet ipsa odio voluptates, obcaecati consequatur esse sed possimus quae autem nihil.</div>
+            <img v-if="item.image_url" :src="`http://localhost:5001${item.image_url}`" alt="КРутое" class="post-image">
             <div class="post-bottom">
                 <div class="posts-title-cont">
                     <h3>{{ item.title }}</h3>
@@ -44,23 +43,31 @@ onMounted(() => {
     width: 70%;
 }
 .posts-title-cont {
+    max-width: 100%;
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
 }
 .post {
+    display: flex;
+    flex-direction: column;
     margin-bottom: 30px;
     border: 1px solid #3e3;
+    padding: 10px 10px;
 }
 .content-p {
     margin: 0;
 }
 .post-bottom {
     padding: 0 10px 10px 10px;
+    width: 100%;
 }
 .blue {
     background-color: blue;
     height: 300px;
+}
+.post-image {
+    max-width: 500px;
 }
 </style>

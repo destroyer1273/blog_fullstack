@@ -3,6 +3,7 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const pool = require("./db");
 const multer = require("multer");
+const path = require("path");
 
 const app = express();
 
@@ -30,6 +31,7 @@ const upload = multer({
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 app.get('')
 
@@ -105,7 +107,7 @@ app.post('/api/auth/login', async (req, res) => {
                 name: user.username
             }
         });
-    } catch( err) {
+    } catch(err) {
         console.error("Ошибка входа", error);
         res.status(500).json({error: 'Ошибка сервера'});
     }
@@ -132,7 +134,7 @@ app.post("/api/posts/create", upload.single('image'), async (req, res) => {
             imageUrl = `/uploads/posts/${req.file.filename}`;
             result = await pool.query(
                 `INSERT INTO posts (title, content, author_id, image_url, created_at) 
-                VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,[title, content, authorId, imageUrl]);
+                VALUES ($1, $2, $3, $4, NOW()) RETURNING *`, [title, content, authorId, imageUrl]);
         } else {
             result = await pool.query("INSERT INTO posts (title, content, author_id, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *", [title, content, authorId]);
         }
@@ -144,6 +146,38 @@ app.post("/api/posts/create", upload.single('image'), async (req, res) => {
         });
     } catch (error) {
         console.error("Ошибка создания поста", error);
+        res.status(500).json({error: "Ошибка сервера"});
+    }
+});
+
+app.post("/api/posts/edit", upload.single("image"), async (req, res) => {
+    try {
+        const {title, content, author_id, post_id } = req.body;
+
+        if(!title || !content || !author_id) {
+            return res.status(400).json({error: "Все поля обязательны"});
+        }
+
+        const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [author_id]);
+        if(userExists.rows.length === 0) {
+            return res.status(404).json({error: "Пользователя с таким id не существует"});
+        }
+
+        let result;
+        let imageUrl = null;
+
+        if(req.file) {
+            imageUrl = `/uploads/posts/${req.file.filename}`;
+            result = await pool.query("UPDATE posts SET title = $1, content = $2, image_url = $3 WHERE id = $4", [title, content, imageUrl, post_id]);
+        } else {
+            result = await pool.query("UPDATE posts SET title = $1, content = $2 WHERE id = $3", [title, content, post_id]);
+        }
+        res.status(201).json({
+            message: "Пост отредактирован",
+            post: result.rows[0]
+        })
+    } catch (error) {
+        console.log("Ошибка редактирование поста", error);
         res.status(500).json({error: "Ошибка сервера"});
     }
 });
