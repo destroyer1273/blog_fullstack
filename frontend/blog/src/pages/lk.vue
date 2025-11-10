@@ -41,7 +41,7 @@ const toMakePost = async () => {
     )
     
     console.log("Пост создан:", response.data)
-    
+    await getUserPosts();
     
     post.value = { title: '', content: '', image: null }
     document.querySelector('#image-upload').value = ''
@@ -94,11 +94,60 @@ const toEditPost = async () => {
                 }
             }
         )
+        await getUserPosts();
+
+        post.value = { title: '', content: '', image: null }
+        document.querySelector('#image-upload').value = ''
     } catch (error) {
         console.log(error);
     }
 }
 
+// EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER
+
+const isUserModalOpen = ref(false);
+const toOpenUserModal = () => {
+    isUserModalOpen.value = true;
+}
+const toCloseUserModal = () => {
+    isUserModalOpen.value = false;
+}
+
+const editImageUpload = (event) => {
+    userEditData.value.avatar = event.target.files[0];
+}
+
+const toEditUser = async () => {
+    try {
+        const formData = new FormData();
+        formData.append('newName', userEditData.value.name);
+        formData.append("user_id", userEditData.value.user_id);
+        if(userEditData.value.avatar) {
+            formData.append("avatar", userEditData.value.avatar);
+        }
+
+        const response = await axios.post("http://localhost:5001/api/user/edit",
+            formData,
+            {
+                headers: {
+                    "Content-Type": 'multipart/form-data'
+                }
+            }
+        );
+        userStore.currentUser = response.data.user
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        toCloseUserModal();
+    } catch (error) {
+        console.log("Ошибка: ", error);
+    }
+}
+const userEditData = ref({
+    user_id: userStore.currentUser.id,
+    name: '', 
+    avatar: null
+});
+
+// EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER EDIT USER
 onMounted(() => {
     console.log(userStore.currentUser.id);
     getUserPosts();
@@ -113,8 +162,19 @@ onMounted(() => {
 </div>  
 <div class="userInfo">
     <div>
-        <img :src="defaultAvatar" alt="avatar" class="user-avatar">
-        <p>{{ userStore.currentUser.name }}</p>
+        <img v-if="userStore.currentUser.avatar_url" :src="`http://localhost:5001${userStore.currentUser.avatar_url}`" alt="Аватарка" class="user-avatar">
+        <img v-else :src="defaultAvatar" alt="avatar" class="user-avatar">
+        <p>{{ userStore.currentUser.username }}</p>
+        <button class="user-edit-btn" @click="toOpenUserModal">Редактировать</button>
+    </div>
+    <div v-if="isUserModalOpen" class="modalToEdit">
+            <button @click="toCloseUserModal" class="modalCloseBtn">X</button>
+            <form @submit.prevent="toEditUser" class="edit-form">
+                <label for="nameEdit">Имя</label>
+                <input v-model="userEditData.name" type="text" id="nameEdit" :placeholder="userStore.currentUser.username">
+                <input type="file" @change="editImageUpload" accept="image/*" > 
+                <button type="submit">Применить редактирование</button>
+            </form>
     </div>
 </div>
 <div class="main_cont">
@@ -314,5 +374,22 @@ onMounted(() => {
         display: flex;
         flex-direction: row;
         align-items: center;
+    }
+    .userInfo div p {
+        margin-right: 20px;
+    }
+    .user-edit-btn {
+        width: 120px;
+        height: 30px;
+        border: none;
+        border-radius: 20px;
+        background-color: rgb(105, 105, 210);
+        color: #0a2f09;
+    }
+    .user-edit-btn:hover {
+        background-color: rgb(79, 79, 158);
+    }
+    .user-edit-btn:active {
+        background-color: rgb(136, 136, 240);
     }
 </style>

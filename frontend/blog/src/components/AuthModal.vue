@@ -10,9 +10,28 @@ defineProps({
 
 const toAuthData = ref({})
 
+const handleAvatarUpload = (event) => {
+    toAuthData.value.avatar = event.target.files[0];
+} 
+
 const toRegisterUser = async () => {
     try {
-        const response = await axios.post("http://localhost:5001/api/auth/register", {email: toAuthData.value.email, name: toAuthData.value.name, password: toAuthData.value.password});
+        const formData = new FormData();
+        formData.append("email", toAuthData.value.email);
+        formData.append("name", toAuthData.value.name);
+        formData.append("password", toAuthData.value.password);
+        if(toAuthData.value.avatar) {
+            formData.append("avatar", toAuthData.value.avatar);
+        }
+        // {email: toAuthData.value.email, name: toAuthData.value.name, password: toAuthData.value.password}
+        const response = await axios.post("http://localhost:5001/api/auth/register",
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data"
+                }
+            }
+         );
         userStore.currentUser = response.data.user;
         localStorage.setItem('user', JSON.stringify(response.data.user));
         emit("close");
@@ -30,6 +49,7 @@ const emit = defineEmits(['close'])
         <form @submit.prevent="toRegisterUser">
             <input v-model="toAuthData.email" type="email" placeholder="email">
             <input v-model="toAuthData.name" type="text" placeholder="имя">
+            <input type="file" @change="handleAvatarUpload" accept="image/*">  
             <input v-model="toAuthData.password" type="text" placeholder="Пароль">
             <button type="submit">Зарегистрироваться</button>
         </form>

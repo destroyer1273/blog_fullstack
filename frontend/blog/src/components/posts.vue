@@ -29,6 +29,7 @@ onMounted(() => {
                 <div class="posts-title-cont">
                     <h3>{{ item.title }}</h3>
                     <p>Автор: {{ item.username }}</p>
+                    <img :src="`http://localhost:5001${item.avatar_url}`" alt="Аватарка пользователя" class="user-avatar">
                 </div>
                 <p class="content-p">{{ item.content }}</p>
                 
@@ -69,5 +70,8 @@ onMounted(() => {
 }
 .post-image {
     max-width: 500px;
+}
+.user-avatar {
+    max-width: 60px;
 }
 </style>

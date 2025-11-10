@@ -7,7 +7,7 @@ const path = require("path");
 
 const app = express();
 
-const storage  = multer.diskStorage({
+const postStorage  = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/posts/');
     },
@@ -17,9 +17,31 @@ const storage  = multer.diskStorage({
     }
 });
 
-const upload = multer({ 
-  storage: storage,
+const uploadPost = multer({ 
+  storage: postStorage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только изображения!'), false);
+    }
+  }
+});
+
+const avatarStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/avatars/');  // отдельная папка
+    },
+    filename: (req, file, cb) => {
+        const uniqueName = `avatar_${Date.now()}${path.extname(file.originalname)}`;
+        cb(null, uniqueName);
+    }
+});
+
+const uploadAvatar = multer({ 
+  storage: avatarStorage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB для аватаров
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -33,13 +55,13 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-app.get('')
+
 
 app.get("/api/posts", async (req, res) => {
     try {
         //users.username на ноуте , users.name пк 16 строчка
         const result = await pool.query(`
-      SELECT posts.*, users.username  
+      SELECT posts.*, users.username, users.avatar_url   
       FROM posts 
       JOIN users ON posts.author_id = users.id 
       ORDER BY created_at DESC
@@ -50,34 +72,6 @@ app.get("/api/posts", async (req, res) => {
     }
 });
 
-app.post('/api/auth/register', async (req ,res) => {
-    try {
-        const { email, name, password } = req.body;
-
-        if(!email && !name && !password) {
-            return res.status(500).json({error: "Все поля обязательны"});
-        }
-        
-        const userExists = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
-
-        if(userExists.rows.length > 0) {
-            return res.status(400).json({error: "Email занят"});
-        }
-
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-        // user - пк, username - ноут
-        const result = await pool.query("INSERT INTO users (email, username, password_hash) VALUES ($1, $2, $3) RETURNING id, email, username", [email, name, hashedPassword]);
-
-        res.status(201).json({
-            message: 'пользователь создан',
-            user: result.rows[0]
-        });
-    } catch (error) {
-        console.error("Ошибка регистрации: ", error);
-        res.status(500).json({error: "Ошибка сервера"})
-    }
-});
 
 app.post('/api/auth/login', async (req, res) => {
     try {
@@ -104,7 +98,8 @@ app.post('/api/auth/login', async (req, res) => {
             user: {
                 id: user.id,
                 email: user.email,
-                name: user.username
+                username: user.username,
+                avatar_url: user.avatar_url
             }
         });
     } catch(err) {
@@ -114,7 +109,7 @@ app.post('/api/auth/login', async (req, res) => {
     
 });
 
-app.post("/api/posts/create", upload.single('image'), async (req, res) => {
+app.post("/api/posts/create", uploadPost.single('image'), async (req, res) => {
     try {
         const {title, content, authorId } = req.body;
         
@@ -150,7 +145,72 @@ app.post("/api/posts/create", upload.single('image'), async (req, res) => {
     }
 });
 
-app.post("/api/posts/edit", upload.single("image"), async (req, res) => {
+app.post("/api/user/edit", uploadAvatar.single('avatar'), async (req, res) => {
+    try {
+        const { newName, user_id } = req.body;
+
+        if(!newName) {
+            return res.status(500).json({error: "Имя обязательно"});
+        }
+
+        let result;
+        let imageUrl = null;
+
+        if(req.file) {
+            imageUrl = `/uploads/avatars/${req.file.filename}`;
+            result = await pool.query("UPDATE users SET username = $1, avatar_url = $2 WHERE id = $3 RETURNING id, username, email, avatar_url", [ newName, imageUrl, user_id]);
+        } else {
+            result = await pool.query("UPDATE users SET username = $1 WHERE id = $2  RETURNING id, username, email, avatar_url", [ newName, user_id]);
+        }
+
+        res.status(200).json({
+            message: "Личные данные отредактированы",
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error("Ошибка редактирование профиля", error);
+        res.status(500).json({error: "Ошибка сервера"});
+    }
+});
+
+app.post('/api/auth/register', uploadAvatar.single("avatar"), async (req ,res) => {
+    try {
+        const { email, name, password } = req.body;
+
+        if(!email && !name && !password) {
+            return res.status(500).json({error: "Все поля обязательны"});
+        }
+        
+        const userExists = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+
+        if(userExists.rows.length > 0) {
+            return res.status(400).json({error: "Email занят"});
+        }
+        
+        let result;
+        let imageUrl = null;
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        if(req.file) {
+            imageUrl = `/uploads/avatars/${req.file.filename}`;
+            result = await pool.query("INSERT INTO users (email, username, password_hash, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url", [email, name, hashedPassword, imageUrl]);
+        } else {
+            result = await pool.query("INSERT INTO users (email, username, password_hash) VALUES ($1, $2, $3) RETURNING id, email, username", [email, name, hashedPassword]);
+        }
+        
+        // user - пк, username - ноут
+
+        res.status(201).json({
+            message: 'пользователь создан',
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error("Ошибка регистрации: ", error);
+        res.status(500).json({error: "Ошибка сервера"})
+    }
+});
+
+app.post("/api/posts/edit", uploadPost.single("image"), async (req, res) => {
     try {
         const {title, content, author_id, post_id } = req.body;
 
@@ -189,7 +249,7 @@ app.get("/api/posts/userPosts", async (req, res) => {
         const userExists = await pool.query("SELECT * FROM posts WHERE author_id = $1", [userId]);
 
         if(userExists.rows.length === 0) {
-            return res.status(400).json({posts: 0});
+            return res.status(200).json({posts: []});
         }
 
         const result = await pool.query("SELECT * FROM posts WHERE author_id = $1", [userId]);
