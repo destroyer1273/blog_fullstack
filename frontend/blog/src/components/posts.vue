@@ -28,8 +28,9 @@ onMounted(() => {
             <div class="post-bottom">
                 <div class="posts-title-cont">
                     <h3>{{ item.title }}</h3>
-                    <p>Автор: {{ item.username }}</p>
-                    <img :src="`http://localhost:5001${item.avatar_url}`" alt="Аватарка пользователя" class="user-avatar">
+                    <!-- name-пк username-ноут -->
+                    <p>Автор: {{ item.name }}</p>
+                    <img v-if="item.avatar_url" :src="`http://localhost:5001${item.avatar_url}`" alt="Аватарка пользователя" class="user-avatar">
                 </div>
                 <p class="content-p">{{ item.content }}</p>
                 

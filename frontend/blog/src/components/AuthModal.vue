@@ -32,6 +32,10 @@ const toRegisterUser = async () => {
                 }
             }
          );
+        
+        localStorage.setItem("token", response.data.token);
+        axios.defaults.headers.common["Authorization"] = `Bearer ${response.data.token}`;
+
         userStore.currentUser = response.data.user;
         localStorage.setItem('user', JSON.stringify(response.data.user));
         emit("close");

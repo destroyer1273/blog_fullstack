@@ -19,10 +19,14 @@ const handleLogin = async () => {
         const response = await axios.post("http://localhost:5001/api/auth/login", {email: toLoginData.value.email, password: toLoginData.value.password});
         user.value = response.data;
         
+        localStorage.setItem("token", response.data.token);
+        axios.defaults.headers.common["Authorization"] = `Bearer ${response.data.token}`;
+
         userStore.currentUser = user.value.user;
         localStorage.setItem("user", JSON.stringify(user.value.user));
 
         isLoading.value = false;
+        emit('close');
     } catch (error) {
         console.log('Ошибка', error);
     }
